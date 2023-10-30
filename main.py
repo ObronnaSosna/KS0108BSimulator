@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 from ks0108b import KS0108
 import io
 import base64
+from icon import icon
 
 
 # parse checkboxes into binary number
@@ -82,7 +83,7 @@ layout = [
 ]
 
 # Create the window
-window = sg.Window("KS0108B simulator", layout)
+window = sg.Window("KS0108B simulator", layout, icon=icon)
 
 
 # Display and interact with the Window using an Event Loop
@@ -101,7 +102,7 @@ while True:
             [sg.Text("CS2:")],
             [sg.Text(f"{displays[2].displayRam()}", font="Monospace 8", key="r")],
         ]
-        window_ram = sg.Window("RAM", layout2, modal=True)
+        window_ram = sg.Window("RAM", layout2, icon=icon, modal=True)
         while True:
             event, values = window_ram.read()
             if event == "Exit" or event == sg.WIN_CLOSED:
