@@ -6,7 +6,7 @@ class KS0108:
         self.x_address: int = 0
         self.y_address: int = 0
         self.z_address: int = 0
-        self.on: bool = 0
+        self.on: bool = 1
         self.ram = [[0 for y in range(64)] for x in range(8)]
 
     def commandLookup(self, data: int):
@@ -58,6 +58,8 @@ class KS0108:
         if self.commandLookup(data) == "read data":
             return 0b1100000000 + self.readData()
 
+        return data
+
     def setYaddress(self, address):
         self.y_address = address
 
@@ -94,7 +96,9 @@ class KS0108:
             for x, bits in enumerate(page):
                 for i in range(8):
                     if self.on:
-                        img.putpixel((x, y * 8 + i), (bits >> i) & 1)
+                        img.putpixel(
+                            ((x + self.z_address) % 64, y * 8 + i), (bits >> i) & 1
+                        )
         return img
 
     def displayRam(self):

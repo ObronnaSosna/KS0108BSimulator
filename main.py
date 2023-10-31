@@ -11,34 +11,34 @@ from icon import icon
 def getData():
     data = 0
     for i, value in enumerate(values.values()):
-        if i < 3:
+        if i < 5:
             pass
         else:
-            data += 2 ** (9 - (i - 3)) * value
+            data += 2 ** (9 - (i - 5)) * value
     return data
 
 
 # change simulator output to something tk can display
-def convertImage(displays):
-    img = displays[0].generateImage()
-    img2 = displays[1].generateImage()
-    img3 = displays[2].generateImage()
-    img = img.resize((320, 320), Image.LANCZOS)
-    img2 = img2.resize((320, 320), Image.LANCZOS)
-    img3 = img3.resize((320, 320), Image.LANCZOS)
-    out = Image.new("1", (960, 320))
-    out.paste(img, (0, 0))
-    out.paste(img2, (320, 0))
-    out.paste(img3, (640, 0))
+def convertImage(displays, scale):
+    scale_size = 64 * scale
+    displays_number = len(displays)
+    out = Image.new("1", (scale_size * displays_number, scale_size))
+    for i, display in enumerate(displays):
+        img = display.generateImage().resize((scale_size, scale_size), Image.LANCZOS)
+        out.paste(img, (scale_size * i, 0))
     bio = io.BytesIO()
     out.save(bio, format="PNG")
     return bio
 
 
-displays = [KS0108(), KS0108(), KS0108()]
-for display in displays:
-    display.display_on_off(1)
-bio = convertImage(displays)
+def createDisplays(n):
+    return [KS0108() for x in range(n)]
+
+
+scale = 5
+displays = createDisplays(3)
+display = displays[0]
+bio = convertImage(displays, scale)
 
 # Define the window's contents
 layout = [
@@ -48,42 +48,47 @@ layout = [
         ),
     ],
     [
+        sg.Text("Chips:", size=(6, 1)),
+        sg.Combo([1, 2, 3], default_value=3, size=(2, 1), key="dn", enable_events=True),
+        sg.Text("Scale:", size=(6, 1)),
+        sg.Combo(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            default_value=5,
+            size=(2, 1),
+            key="scale",
+            enable_events=True,
+        ),
         sg.Text("Data IN: ", size=(13, 1), key="din"),
         sg.Text("Data OUT: ", size=(15, 1), key="dout"),
-        sg.Text("Command: ", size=(40, 1), key="cmd"),
+        sg.Text("Command: ", size=(40, 1), key="cmd", expand_x=True),
         sg.Text("Y address: ", size=(16, 1), key="y"),
         sg.Text("X address: ", size=(16, 1), key="x"),
         sg.Text("Z address: ", size=(16, 1), key="z"),
     ],
     [
-        sg.Button("E", key="e"),
-        sg.Radio("CS0", "cs", key="cs0", default=True),
-        sg.Radio(
-            "CS1",
-            "cs",
-            key="cs1",
-        ),
-        sg.Radio(
-            "CS2",
-            "cs",
-            key="cs2",
-        ),
-        sg.Checkbox("RS", key="rs", enable_events=True),
-        sg.Checkbox("R/W", key="rw", enable_events=True),
-        sg.Checkbox("DB7", key="db7", enable_events=True),
-        sg.Checkbox("DB6", key="db6", enable_events=True),
-        sg.Checkbox("DB5", key="db5", enable_events=True),
-        sg.Checkbox("DB4", key="db4", enable_events=True),
-        sg.Checkbox("DB3", key="db3", enable_events=True),
-        sg.Checkbox("DB2", key="db2", enable_events=True),
-        sg.Checkbox("DB1", key="db1", enable_events=True),
-        sg.Checkbox("DB0", key="db0", enable_events=True),
-        sg.Button("Show Memory", key="ram"),
+        [
+            sg.Button("E", key="e"),
+            sg.Radio("CS0", "cs", key="cs0", default=True, enable_events=True),
+            sg.Radio("CS1", "cs", key="cs1", enable_events=True),
+            sg.Radio("CS2", "cs", key="cs2", enable_events=True),
+            sg.Checkbox("RS", key="rs", enable_events=True),
+            sg.Checkbox("R/W", key="rw", enable_events=True),
+            sg.Checkbox("DB7", key="db7", enable_events=True),
+            sg.Checkbox("DB6", key="db6", enable_events=True),
+            sg.Checkbox("DB5", key="db5", enable_events=True),
+            sg.Checkbox("DB4", key="db4", enable_events=True),
+            sg.Checkbox("DB3", key="db3", enable_events=True),
+            sg.Checkbox("DB2", key="db2", enable_events=True),
+            sg.Checkbox("DB1", key="db1", enable_events=True),
+            sg.Checkbox("DB0", key="db0", enable_events=True),
+            sg.Button("Show Memory", key="ram", expand_x=True),
+        ],
     ],
 ]
 
 # Create the window
-window = sg.Window("KS0108B simulator", layout, icon=icon)
+window = sg.Window("KS0108B simulator", layout, icon=icon, finalize=True)
+window.bind("<Return>", "enter")
 
 
 # Display and interact with the Window using an Event Loop
@@ -93,15 +98,42 @@ while True:
     if event == sg.WINDOW_CLOSED:
         break
 
+    # change number of drivers
+    if event == "dn":
+        dn = int(values["dn"])
+        for i in range(3):
+            if i >= dn:
+                window[f"cs{i}"].update(disabled=True)
+            else:
+                window[f"cs{i}"].update(disabled=False)
+        displays = createDisplays(dn)
+        display = displays[0]
+        bio = convertImage(displays, scale)
+        window["image"].update(data=bio.getvalue())
+
+    # change scale
+    if event == "scale":
+        scale = int(values["scale"])
+        bio = convertImage(displays, scale)
+        window["image"].update(data=bio.getvalue())
+
+    # change chip
+    if event in ["cs0", "cs1", "cs2"]:
+        for i in range(len(displays)):
+            if values[f"cs{i}"] == True:
+                display = displays[i]
+        window["y"].update(f"Y address: {hex(display.y_address)}")
+        window["x"].update(f"X address: {hex(display.x_address)}")
+        window["z"].update(f"Z address: {hex(display.z_address)}")
+
+    # display ram modal
     if event == "ram":
-        layout2 = [
-            [sg.Text("CS0:")],
-            [sg.Text(f"{displays[0].displayRam()}", font="Monospace 8", key="r")],
-            [sg.Text("CS1:")],
-            [sg.Text(f"{displays[1].displayRam()}", font="Monospace 8", key="r")],
-            [sg.Text("CS2:")],
-            [sg.Text(f"{displays[2].displayRam()}", font="Monospace 8", key="r")],
-        ]
+        layout2 = []
+        for i, display in enumerate(displays):
+            layout2.append([sg.Text(f"CS{i}:")])
+            layout2.append(
+                [sg.Text(f"{display.displayRam()}", font="Monospace 8", key="r")]
+            )
         window_ram = sg.Window("RAM", layout2, icon=icon, modal=True)
         while True:
             event, values = window_ram.read()
@@ -111,16 +143,10 @@ while True:
         window_ram.close()
 
     # simulate pulse on enable pin (run command)
-    if event == "e":
-        if values["cs0"] == True:
-            display = displays[0]
-        if values["cs1"] == True:
-            display = displays[1]
-        if values["cs2"] == True:
-            display = displays[2]
+    if event in ["e", "enter"]:
         data = getData()
         dout = display.runCommand(data)
-        bio = convertImage(displays)
+        bio = convertImage(displays, scale)
         window["image"].update(data=bio.getvalue())
         window["dout"].update(f"Data OUT: {hex(dout)}")
         window["y"].update(f"Y address: {hex(display.y_address)}")
