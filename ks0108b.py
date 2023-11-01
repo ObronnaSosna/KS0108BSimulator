@@ -44,7 +44,7 @@ class KS0108:
             return data
 
         if self.commandLookup(data) == "status read":
-            return int(f"0b0100{int(self.on)}00000", 2)
+            return int(f"0b0100{int(not self.on)}00000", 2)
 
         if self.commandLookup(data) == "set y address (address)":
             self.setYaddress(int(format(data, "010b")[4:10], 2))
