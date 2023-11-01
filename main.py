@@ -37,7 +37,8 @@ def createDisplays(n):
 
 scale = 5
 displays = createDisplays(3)
-display = displays[0]
+cs = 0
+display = displays[cs]
 bio = convertImage(displays, scale)
 
 # Define the window's contents
@@ -68,6 +69,7 @@ layout = [
     [
         [
             sg.Button("E", key="e"),
+            sg.Button("Reset", key="reset"),
             sg.Radio("CS0", "cs", key="cs0", default=True, enable_events=True),
             sg.Radio("CS1", "cs", key="cs1", enable_events=True),
             sg.Radio("CS2", "cs", key="cs2", enable_events=True),
@@ -121,6 +123,7 @@ while True:
     if event in ["cs0", "cs1", "cs2"]:
         for i in range(len(displays)):
             if values[f"cs{i}"] == True:
+                cs = i
                 display = displays[i]
         window["y"].update(f"Y address: {hex(display.y_address)}")
         window["x"].update(f"X address: {hex(display.x_address)}")
@@ -141,6 +144,18 @@ while True:
                 break
 
         window_ram.close()
+
+    # reset chip
+    if event == "reset":
+        displays[cs] = KS0108()
+        display = displays[cs]
+        dout = 0
+        bio = convertImage(displays, scale)
+        window["image"].update(data=bio.getvalue())
+        window["dout"].update(f"Data OUT: {hex(dout)}")
+        window["y"].update(f"Y address: {hex(display.y_address)}")
+        window["x"].update(f"X address: {hex(display.x_address)}")
+        window["z"].update(f"Z address: {hex(display.z_address)}")
 
     # simulate pulse on enable pin (run command)
     if event in ["e", "enter"]:
