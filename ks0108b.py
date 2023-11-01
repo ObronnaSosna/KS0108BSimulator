@@ -12,22 +12,26 @@ class KS0108:
     def commandLookup(self, data: int):
         # 10 bit bus
         # rs rw db7 db6 db5 db4 db3 db2 db1 db0
-        if format(data, "010b")[0:9] == "000011111":  # display on/off
+        data = format(data, "010b")
+        if data[0:9] == "000011111":  # display on/off
             return "display on/off"
 
-        if format(data, "010b")[0:4] == "0001":  # set y address (address)
+        if data[0:2] == "01" and data[3] == "0" and data[6:10] == "0000":  # status read
+            return "status read"
+
+        if data[0:4] == "0001":  # set y address (address)
             return "set y address (address)"
 
-        if format(data, "010b")[0:7] == "0010111":  # set x address (page)
+        if data[0:7] == "0010111":  # set x address (page)
             return "set x address (page)"
 
-        if format(data, "010b")[0:4] == "0011":  # set z address (display line)
+        if data[0:4] == "0011":  # set z address (display line)
             return "set z address (display line)"
 
-        if format(data, "010b")[0:2] == "10":  # write data
+        if data[0:2] == "10":  # write data
             return "write data"
 
-        if format(data, "010b")[0:2] == "11":  # read data
+        if data[0:2] == "11":  # read data
             return "read data"
         else:
             return "no valid command"
@@ -38,6 +42,9 @@ class KS0108:
         if self.commandLookup(data) == "display on/off":
             self.display_on_off(int(format(data, "010b")[9:10], 2))
             return data
+
+        if self.commandLookup(data) == "status read":
+            return int(f"0b0100{int(self.on)}00000", 2)
 
         if self.commandLookup(data) == "set y address (address)":
             self.setYaddress(int(format(data, "010b")[4:10], 2))
