@@ -2,9 +2,10 @@
 import PySimpleGUI as sg
 from PIL import Image, ImageTk
 from ks0108b import KS0108
+import ks0108b
 import io
 import base64
-from icon import icon
+import history
 
 
 # parse checkboxes into binary number
@@ -40,6 +41,7 @@ displays = createDisplays(3)
 cs = 0
 display = displays[cs]
 bio = convertImage(displays, scale)
+
 
 # Define the window's contents
 layout = [
@@ -84,6 +86,7 @@ layout = [
             sg.Checkbox("DB1", key="db1", enable_events=True),
             sg.Checkbox("DB0", key="db0", enable_events=True),
             sg.Button("Show Memory", key="ram", expand_x=True),
+            sg.Button("History", key="cmds", expand_x=True),
         ],
     ],
 ]
@@ -145,11 +148,28 @@ while True:
 
         window_ram.close()
 
+    # display commands modal
+    if event == "cmds":
+        layout3 = [
+            [sg.Text(history.print())],
+            [sg.Button("Save commands", key="save", expand_x=True)],
+        ]
+        window_cmd = sg.Window("Command history", layout3, icon=icon, modal=True)
+        while True:
+            event, values = window_cmd.read()
+            if event == "Exit" or event == sg.WIN_CLOSED:
+                break
+
+            if event == "save":
+                history.saveHumanReadable("commands.txt")
+
+        window_cmd.close()
     # reset chip
     if event == "reset":
         displays[cs] = KS0108()
         display = displays[cs]
         dout = 0
+        history.clear()
         bio = convertImage(displays, scale)
         window["image"].update(data=bio.getvalue())
         window["dout"].update(f"Data OUT: {hex(dout)}")
@@ -160,6 +180,7 @@ while True:
     # simulate pulse on enable pin (run command)
     if event in ["e", "enter"]:
         data = getData()
+        history.add(cs, data)
         dout = display.runCommand(data)
         bio = convertImage(displays, scale)
         window["image"].update(data=bio.getvalue())
@@ -172,7 +193,7 @@ while True:
     if event in ["rs", "rw", "db7", "db6", "db5", "db4", "db3", "db2", "db1", "db0"]:
         data = getData()
         window["din"].update(f"Data IN: {hex(data)}")
-        window["cmd"].update(f"Command: {display.commandLookup(data)}")
+        window["cmd"].update(f"Command: {ks0108b.commandLookup(data)}")
 
 # Finish up by removing from the screen
 window.close()
