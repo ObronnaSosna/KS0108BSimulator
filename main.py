@@ -2,6 +2,7 @@
 import PySimpleGUI as sg
 from PIL import Image, ImageTk
 from ks0108b import KS0108
+from icon import icon
 import ks0108b
 import io
 import base64
