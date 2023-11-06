@@ -105,7 +105,7 @@ class KS0108:
                 for i in range(8):
                     if self.on:
                         img.putpixel(
-                            ((x + self.z_address) % 64, y * 8 + i), (bits >> i) & 1
+                            (x, ((y * 8 + i) - self.z_address) % 64), (bits >> i) & 1
                         )
         return img
 
