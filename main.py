@@ -7,16 +7,24 @@ import ks0108b
 import io
 import base64
 import history
+import arduino
+
+ard = False
 
 
 # parse checkboxes into binary number
 def getData():
     data = 0
-    for i, value in enumerate(values.values()):
-        if i < 5:
-            pass
-        else:
-            data += 2 ** (9 - (i - 5)) * value
+    for key, value in values.items():
+        if "db" in key:
+            i = int(key.replace("db", ""))
+            data += 2**i * value
+        if "rw" in key:
+            i = 8
+            data += 2**i * value
+        if "rs" in key:
+            i = 9
+            data += 2**i * value
     return data
 
 
@@ -68,6 +76,7 @@ layout = [
         sg.Text("Y address: ", size=(16, 1), key="y"),
         sg.Text("X address: ", size=(16, 1), key="x"),
         sg.Text("Z address: ", size=(16, 1), key="z"),
+        sg.Checkbox("Arduino", key="arduino", enable_events=True),
     ],
     [
         [
@@ -103,6 +112,14 @@ while True:
     # See if user wants to quit or window was closed
     if event == sg.WINDOW_CLOSED:
         break
+
+    if event == "arduino":
+        if values["arduino"]:
+            ard = True
+            arduino.arduinoInit("/dev/ttyUSB0")
+        else:
+            ard = False
+            arduino.arduinoClose()
 
     # change number of drivers
     if event == "dn":
@@ -183,6 +200,8 @@ while True:
         data = getData()
         history.add(cs, data)
         dout = display.runCommand(data)
+        if ard:
+            arduino.sendCommand(cs, data)
         bio = convertImage(displays, scale)
         window["image"].update(data=bio.getvalue())
         window["dout"].update(f"Data OUT: {hex(dout)}")
