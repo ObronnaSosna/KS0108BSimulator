@@ -28,9 +28,14 @@ def saveHumanReadable(filename):
 
 
 def load(filename):
-    with open(filename, "r") as f:
-        return json.loads(f.read())
+    global commands
+    with open(filename) as f:
+        commands = json.load(f)
 
 
 def clear():
     commands = [[], [], []]
+
+
+def clearCs(cs):
+    commands[cs] = []

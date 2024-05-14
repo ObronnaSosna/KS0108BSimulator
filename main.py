@@ -8,6 +8,7 @@ import io
 import base64
 import history
 import arduino
+from time import sleep
 
 ard = False
 
@@ -50,6 +51,7 @@ displays = createDisplays(3)
 cs = 0
 display = displays[cs]
 bio = convertImage(displays, scale)
+ports = arduino.getPorts()
 
 
 # Define the window's contents
@@ -72,10 +74,11 @@ layout = [
         ),
         sg.Text("Data IN: ", size=(13, 1), key="din"),
         sg.Text("Data OUT: ", size=(15, 1), key="dout"),
-        sg.Text("Command: ", size=(40, 1), key="cmd", expand_x=True),
+        sg.Text("Command: ", size=(30, 1), key="cmd", expand_x=True),
         sg.Text("Y address: ", size=(16, 1), key="y"),
         sg.Text("X address: ", size=(16, 1), key="x"),
         sg.Text("Z address: ", size=(16, 1), key="z"),
+        sg.Combo(ports, expand_x=True, enable_events=True, readonly=True, key="port"),
         sg.Checkbox("Arduino", key="arduino", enable_events=True),
     ],
     [
@@ -113,10 +116,10 @@ while True:
     if event == sg.WINDOW_CLOSED:
         break
 
-    if event == "arduino":
+    if event == "arduino" or "port":
         if values["arduino"]:
             ard = True
-            arduino.arduinoInit("/dev/ttyUSB0")
+            arduino.arduinoInit(values["port"])
         else:
             ard = False
             arduino.arduinoClose()
@@ -169,8 +172,12 @@ while True:
     # display commands modal
     if event == "cmds":
         layout3 = [
-            [sg.Text(history.print())],
-            [sg.Button("Save commands", key="save", expand_x=True)],
+            [sg.Text(history.print(), key="history")],
+            [
+                sg.Button("Save commands to .txt", key="saveHuman", expand_x=True),
+                sg.Button("Save commands to .json", key="save", expand_x=True),
+            ],
+            [sg.Button("Load from .json", key="load", expand_x=True)],
         ]
         window_cmd = sg.Window("Command history", layout3, icon=icon, modal=True)
         while True:
@@ -178,8 +185,36 @@ while True:
             if event == "Exit" or event == sg.WIN_CLOSED:
                 break
 
-            if event == "save":
+            if event == "saveHuman":
                 history.saveHumanReadable("commands.txt")
+
+            if event == "save":
+                history.save("commands.json")
+
+            if event == "load":
+                history.load("commands.json")
+                for cs, cmds in enumerate(history.commands):
+                    if cs >= len(displays):
+                        break
+                    displays[cs] = KS0108()
+                    display = displays[cs]
+                    dout = cs
+                    for data in cmds:
+                        dout = display.runCommand(data)
+                        if ard:
+                            arduino.sendCommand(cs, data)
+                            sleep(1)
+                    bio = convertImage(displays, scale)
+                    window["image"].update(data=bio.getvalue())
+                    window["dout"].update(f"Data OUT: {hex(dout)}")
+                    window["y"].update(f"Y address: {hex(display.y_address)}")
+                    window["x"].update(f"X address: {hex(display.x_address)}")
+                    window["z"].update(f"Z address: {hex(display.z_address)}")
+                cs = 0
+                dout = cs
+                display = displays[0]
+                window["cs0"].update(value=True)
+                window_cmd["history"].update(history.print())
 
         window_cmd.close()
     # reset chip
@@ -187,7 +222,7 @@ while True:
         displays[cs] = KS0108()
         display = displays[cs]
         dout = 0
-        history.clear()
+        history.clearCs(cs)
         bio = convertImage(displays, scale)
         window["image"].update(data=bio.getvalue())
         window["dout"].update(f"Data OUT: {hex(dout)}")
