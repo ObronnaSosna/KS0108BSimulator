@@ -197,10 +197,10 @@ while True:
                 for cs, cmds in enumerate(history.commands):
                     if cs >= display.getDriversAmount():
                         break
-                    display.resetDriver(cs)
                     display.changeActiveDriver(cs)
+                    display.resetActiveDriver()
                     for cmd in cmds:
-                        dout = display.runCommandOnCurrentDriver(cmd)
+                        dout = display.runCommandOnActiveDriver(cmd)
                         if ard:
                             arduino.sendCommand(cs, cmd)
                             sleep(1)
