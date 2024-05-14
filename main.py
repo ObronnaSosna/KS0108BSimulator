@@ -34,6 +34,7 @@ def updateDataOut():
     bio = display.getImage()
     registers = display.getActiveDriverRegisters()
     window["image"].update(data=bio.getvalue())
+    window["dout"].update(f"Data OUT: {hex(dout)}")
     window["y"].update(f"Y address: {hex(registers['y'])}")
     window["x"].update(f"X address: {hex(registers['x'])}")
     window["z"].update(f"Z address: {hex(registers['z'])}")
