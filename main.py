@@ -172,7 +172,18 @@ while True:
     # display commands modal
     if event == "cmds":
         layout3 = [
-            [sg.Text(history.print(), key="history")],
+            [
+                sg.Column(
+                    [
+                        [
+                            sg.Text(history.print(), key="history"),
+                        ]
+                    ],
+                    scrollable=True,
+                    vertical_scroll_only=True,
+                    size=(600, 300),
+                )
+            ],
             [
                 sg.Button("Save commands to .txt", key="saveHuman", expand_x=True),
                 sg.Button("Save commands to .json", key="save", expand_x=True),
