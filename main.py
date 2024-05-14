@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import PySimpleGUI as sg
-from PIL import Image, ImageTk
 from ks0108b import KS0108
 from icon import icon
 import ks0108b
@@ -8,6 +7,7 @@ import io
 import base64
 import history
 import arduino
+import display
 from time import sleep
 
 ard = False
@@ -29,28 +29,17 @@ def getData():
     return data
 
 
-# change simulator output to something tk can display
-def convertImage(displays, scale):
-    scale_size = 64 * scale
-    displays_number = len(displays)
-    out = Image.new("1", (scale_size * displays_number, scale_size))
-    for i, display in enumerate(displays):
-        img = display.generateImage().resize((scale_size, scale_size), Image.LANCZOS)
-        out.paste(img, (scale_size * i, 0))
-    bio = io.BytesIO()
-    out.save(bio, format="PNG")
-    return bio
+def updateDataOut():
+    # update image data out and registers
+    bio = display.getImage()
+    registers = display.getActiveDriverRegisters()
+    window["image"].update(data=bio.getvalue())
+    window["y"].update(f"Y address: {hex(registers['y'])}")
+    window["x"].update(f"X address: {hex(registers['x'])}")
+    window["z"].update(f"Z address: {hex(registers['z'])}")
 
 
-def createDisplays(n):
-    return [KS0108() for x in range(n)]
-
-
-scale = 5
-displays = createDisplays(3)
-cs = 0
-display = displays[cs]
-bio = convertImage(displays, scale)
+bio = display.getImage()
 ports = arduino.getPorts()
 
 
@@ -126,41 +115,51 @@ while True:
 
     # change number of drivers
     if event == "dn":
+        # get amount of drivers
         dn = int(values["dn"])
+
+        # disable radio buttons for unused cs
         for i in range(3):
             if i >= dn:
                 window[f"cs{i}"].update(disabled=True)
             else:
                 window[f"cs{i}"].update(disabled=False)
-        displays = createDisplays(dn)
-        display = displays[0]
-        bio = convertImage(displays, scale)
-        window["image"].update(data=bio.getvalue())
+
+        # change nuber of drivers
+        display.changeDriverAmount(dn)
+        history.clear()
+
+        # set cs to 0
+        display.changeActiveDriver(0)
+        window["cs0"].update(value=True)
+
+        updateDataOut()
 
     # change scale
     if event == "scale":
+        # set scale
         scale = int(values["scale"])
-        bio = convertImage(displays, scale)
+        display.setScale(scale)
+
+        # update image
+        bio = display.getImage()
         window["image"].update(data=bio.getvalue())
 
     # change chip
     if event in ["cs0", "cs1", "cs2"]:
-        for i in range(len(displays)):
+        # change active driver
+        for i in range(display.getDriversAmount()):
             if values[f"cs{i}"] == True:
-                cs = i
-                display = displays[i]
-        window["y"].update(f"Y address: {hex(display.y_address)}")
-        window["x"].update(f"X address: {hex(display.x_address)}")
-        window["z"].update(f"Z address: {hex(display.z_address)}")
+                display.changeActiveDriver(i)
+
+        updateDataOut()
 
     # display ram modal
     if event == "ram":
         layout2 = []
-        for i, display in enumerate(displays):
+        for i, ram in enumerate(display.getDriversRam()):
             layout2.append([sg.Text(f"CS{i}:")])
-            layout2.append(
-                [sg.Text(f"{display.displayRam()}", font="Monospace 8", key="r")]
-            )
+            layout2.append([sg.Text(f"{ram}", font="Monospace 8", key="r")])
         window_ram = sg.Window("RAM", layout2, icon=icon, modal=True)
         while True:
             event, values = window_ram.read()
@@ -193,56 +192,43 @@ while True:
 
             if event == "load":
                 history.load("commands.json")
+                # reset drivers and run all loaded commands on the,
                 for cs, cmds in enumerate(history.commands):
-                    if cs >= len(displays):
+                    if cs >= display.getDriversAmount():
                         break
-                    displays[cs] = KS0108()
-                    display = displays[cs]
-                    dout = cs
-                    for data in cmds:
-                        dout = display.runCommand(data)
+                    display.resetDriver(cs)
+                    display.changeActiveDriver(cs)
+                    for cmd in cmds:
+                        dout = display.runCommandOnCurrentDriver(cmd)
                         if ard:
-                            arduino.sendCommand(cs, data)
+                            arduino.sendCommand(cs, cmd)
                             sleep(1)
-                    bio = convertImage(displays, scale)
-                    window["image"].update(data=bio.getvalue())
-                    window["dout"].update(f"Data OUT: {hex(dout)}")
-                    window["y"].update(f"Y address: {hex(display.y_address)}")
-                    window["x"].update(f"X address: {hex(display.x_address)}")
-                    window["z"].update(f"Z address: {hex(display.z_address)}")
-                cs = 0
-                dout = cs
-                display = displays[0]
+
+                updateDataOut()
+
+                # change active driver to 0 and update history
+                display.changeActiveDriver(0)
                 window["cs0"].update(value=True)
                 window_cmd["history"].update(history.print())
 
         window_cmd.close()
     # reset chip
     if event == "reset":
-        displays[cs] = KS0108()
-        display = displays[cs]
+        display.resetActiveDriver()
         dout = 0
-        history.clearCs(cs)
-        bio = convertImage(displays, scale)
-        window["image"].update(data=bio.getvalue())
-        window["dout"].update(f"Data OUT: {hex(dout)}")
-        window["y"].update(f"Y address: {hex(display.y_address)}")
-        window["x"].update(f"X address: {hex(display.x_address)}")
-        window["z"].update(f"Z address: {hex(display.z_address)}")
+        history.clearCs(display.getActiveDriver())
+
+        updateDataOut()
 
     # simulate pulse on enable pin (run command)
     if event in ["e", "enter"]:
         data = getData()
-        history.add(cs, data)
-        dout = display.runCommand(data)
+        history.add(display.getActiveDriver(), data)
+        dout = display.runCommandOnActiveDriver(data)
         if ard:
             arduino.sendCommand(cs, data)
-        bio = convertImage(displays, scale)
-        window["image"].update(data=bio.getvalue())
-        window["dout"].update(f"Data OUT: {hex(dout)}")
-        window["y"].update(f"Y address: {hex(display.y_address)}")
-        window["x"].update(f"X address: {hex(display.x_address)}")
-        window["z"].update(f"Z address: {hex(display.z_address)}")
+
+        updateDataOut()
 
     # update data and command display
     if event in ["rs", "rw", "db7", "db6", "db5", "db4", "db3", "db2", "db1", "db0"]:

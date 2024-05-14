@@ -34,8 +34,10 @@ def load(filename):
 
 
 def clear():
+    global commands
     commands = [[], [], []]
 
 
 def clearCs(cs):
+    global commands
     commands[cs] = []
