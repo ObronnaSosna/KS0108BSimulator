@@ -69,13 +69,16 @@ class KS0108:
         return data
 
     def setYaddress(self, address):
-        self.y_address = address
+        if address in range(64):
+            self.y_address = address
 
     def setXaddress(self, address):
-        self.x_address = address
+        if address in range(8):
+            self.x_address = address
 
     def setZaddress(self, address):
-        self.z_address = address
+        if address in range(64):
+            self.z_address = address
 
     def display_on_off(self, toggle):
         self.on = toggle
