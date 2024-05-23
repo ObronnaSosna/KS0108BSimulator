@@ -291,7 +291,7 @@ while True:
 
             if event == "file":
                 filename = sg.popup_get_file("", no_window=True)
-                if filename == "":
+                if not Path(filename).is_file():
                     continue
 
                 window_convert["path"].update(filename)
