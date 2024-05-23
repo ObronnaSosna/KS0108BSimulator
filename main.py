@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import PySimpleGUI as sg
+from PIL import Image, ImageTk
 from ks0108b import KS0108
 from icon import icon
 import ks0108b
@@ -9,6 +10,8 @@ import history
 import arduino
 import display
 from time import sleep
+import convert
+from pathlib import Path
 
 ard = False
 
@@ -42,10 +45,10 @@ def updateDataOut():
 
 bio = display.getImage()
 ports = arduino.getPorts()
-
+dout = 0
 
 # Define the window's contents
-layout = [
+main_window_layout = [
     [
         sg.Column(
             [[sg.Image(key="image", data=bio.getvalue())]], justification="center"
@@ -88,6 +91,7 @@ layout = [
             sg.Checkbox("DB2", key="db2", enable_events=True),
             sg.Checkbox("DB1", key="db1", enable_events=True),
             sg.Checkbox("DB0", key="db0", enable_events=True),
+            sg.Button("Load Image", key="img", expand_x=True),
             sg.Button("Show Memory", key="ram", expand_x=True),
             sg.Button("History", key="cmds", expand_x=True),
         ],
@@ -95,7 +99,7 @@ layout = [
 ]
 
 # Create the window
-window = sg.Window("KS0108B simulator", layout, icon=icon, finalize=True)
+window = sg.Window("KS0108B simulator", main_window_layout, icon=icon, finalize=True)
 window.bind("<Return>", "enter")
 
 
@@ -134,6 +138,11 @@ while True:
         display.changeActiveDriver(0)
         window["cs0"].update(value=True)
 
+        # reset arduino
+        if ard:
+            arduino.arduinoClose()
+            arduino.arduinoInit(values["port"])
+
         updateDataOut()
 
     # change scale
@@ -171,7 +180,7 @@ while True:
 
     # display commands modal
     if event == "cmds":
-        layout3 = [
+        history_layout = [
             [
                 sg.Column(
                     [
@@ -190,7 +199,7 @@ while True:
             ],
             [sg.Button("Load from .json", key="load", expand_x=True)],
         ]
-        window_cmd = sg.Window("Command history", layout3, icon=icon, modal=True)
+        window_cmd = sg.Window("Command history", history_layout, icon=icon, modal=True)
         while True:
             event, values = window_cmd.read()
             if event == "Exit" or event == sg.WIN_CLOSED:
@@ -214,7 +223,7 @@ while True:
                         dout = display.runCommandOnActiveDriver(cmd)
                         if ard:
                             arduino.sendCommand(cs, cmd)
-                            sleep(1)
+                            sleep(0.0005)
 
                 updateDataOut()
 
@@ -229,7 +238,9 @@ while True:
         display.resetActiveDriver()
         dout = 0
         history.clearCs(display.getActiveDriver())
-
+        if ard:
+            arduino.arduinoClose()
+            arduino.arduinoInit(values["port"])
         updateDataOut()
 
     # simulate pulse on enable pin (run command)
@@ -238,7 +249,7 @@ while True:
         history.add(display.getActiveDriver(), data)
         dout = display.runCommandOnActiveDriver(data)
         if ard:
-            arduino.sendCommand(cs, data)
+            arduino.sendCommand(display.getActiveDriver(), data)
 
         updateDataOut()
 
@@ -247,6 +258,73 @@ while True:
         data = getData()
         window["din"].update(f"Data IN: {hex(data)}")
         window["cmd"].update(f"Command: {ks0108b.commandLookup(data)}")
+
+    if event == "img":
+        image_layout = [
+            [
+                sg.Column(
+                    [[sg.Image(key="convert_image", size=(400, 300))]],
+                    # [[sg.Image(key="con_image")]],
+                    justification="center",
+                ),
+            ],
+            [
+                sg.Text("Threshold:", size=(10, 1)),
+                sg.Slider(
+                    (0, 256), orientation="horizontal", default_value=127, key="tres"
+                ),
+                sg.Text("Choose image", size=(50, 1), key="path"),
+                sg.Button("Browse", key="file"),
+                sg.Button("Convert", key="convert"),
+            ],
+        ]
+        window_convert = sg.Window(
+            "Load Image",
+            image_layout,
+            icon=icon,
+            modal=True,
+        )
+        while True:
+            event, values = window_convert.read()
+            if event == "Exit" or event == sg.WIN_CLOSED:
+                break
+
+            if event == "file":
+                filename = sg.popup_get_file("", no_window=True)
+                if filename == "":
+                    continue
+
+                window_convert["path"].update(filename)
+
+                im = Image.open(filename)
+                im.thumbnail((500, 400))
+                b = io.BytesIO()
+                im.save(b, format="PNG")
+                window_convert["convert_image"].update(data=b.getvalue())
+
+            if event == "convert":
+                if not Path(filename).is_file():
+                    continue
+                tres = values["tres"]
+                convert.convertMultipleChips(filename, display.getDriversAmount(), tres)
+                # reset drivers and run all loaded commands on the,
+                for cs, cmds in enumerate(history.commands):
+                    if cs >= display.getDriversAmount():
+                        break
+                    display.changeActiveDriver(cs)
+                    display.resetActiveDriver()
+                    for cmd in cmds:
+                        dout = display.runCommandOnActiveDriver(cmd)
+                        if ard:
+                            arduino.sendCommand(cs, cmd)
+                            sleep(0.0005)
+
+                updateDataOut()
+
+                # change active driver to 0
+                display.changeActiveDriver(0)
+                window["cs0"].update(value=True)
+                window_convert.close()
 
 # Finish up by removing from the screen
 window.close()

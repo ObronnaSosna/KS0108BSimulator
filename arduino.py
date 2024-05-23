@@ -17,7 +17,7 @@ def sendCommand(cs, data):
     if cs == 1:
         data += 2**10
     try:
-        arduino.write(bytes(str(data), "utf-8"))
+        arduino.write(bytes(str(data) + "a", "utf-8"))
         # arduino.write(str(data).encode())
     except:
         pass
@@ -31,4 +31,4 @@ def arduinoClose():
 
 
 def getPorts():
-    return sorted([x for x, y, z in list_ports.comports() if "USB" in x])
+    return sorted([x for x, y, z in list_ports.comports()])
