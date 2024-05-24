@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import PySimpleGUI as sg
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageOps
 from ks0108b import KS0108
 from icon import icon
 import ks0108b
@@ -9,11 +9,8 @@ import base64
 import history
 import arduino
 import display
-from time import sleep
 import convert
 from pathlib import Path
-
-ard = False
 
 
 # parse checkboxes into binary number
@@ -56,13 +53,25 @@ main_window_layout = [
     ],
     [
         sg.Text("Chips:", size=(6, 1)),
-        sg.Combo([1, 2, 3], default_value=3, size=(2, 1), key="dn", enable_events=True),
+        sg.Combo(
+            [1, 2, 3],
+            default_value=display.default_display_amount,
+            size=(2, 1),
+            key="dn",
+            enable_events=True,
+        ),
         sg.Text("Scale:", size=(6, 1)),
         sg.Combo(
             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-            default_value=5,
+            default_value=display.default_scale,
             size=(2, 1),
             key="scale",
+            enable_events=True,
+        ),
+        sg.Checkbox(
+            "Invert",
+            key="invert",
+            default=display.default_invert,
             enable_events=True,
         ),
         sg.Text("Data IN: ", size=(13, 1), key="din"),
@@ -103,6 +112,15 @@ window = sg.Window("KS0108B simulator", main_window_layout, icon=icon, finalize=
 window.bind("<Return>", "enter")
 
 
+dn = display.getDriversAmount()
+
+# disable radio buttons for unused cs
+for i in range(3):
+    if i >= dn:
+        window[f"cs{i}"].update(disabled=True)
+    else:
+        window[f"cs{i}"].update(disabled=False)
+
 # Display and interact with the Window using an Event Loop
 while True:
     event, values = window.read()
@@ -110,17 +128,19 @@ while True:
     if event == sg.WINDOW_CLOSED:
         break
 
+    if event == "invert":
+        display.setInvert(values["invert"])
+        updateDataOut()
+
     if event == "arduino" or "port":
         if values["arduino"]:
-            ard = True
             arduino.arduinoInit(values["port"])
         else:
-            ard = False
             arduino.arduinoClose()
 
     # change number of drivers
     if event == "dn":
-        # get amount of drivers
+        # get amount of set drivers
         dn = int(values["dn"])
 
         # disable radio buttons for unused cs
@@ -139,7 +159,7 @@ while True:
         window["cs0"].update(value=True)
 
         # reset arduino
-        if ard:
+        if arduino.enabled:
             arduino.arduinoClose()
             arduino.arduinoInit(values["port"])
 
@@ -221,9 +241,8 @@ while True:
                     display.resetActiveDriver()
                     for cmd in cmds:
                         dout = display.runCommandOnActiveDriver(cmd)
-                        if ard:
+                        if arduino.enabled:
                             arduino.sendCommand(cs, cmd)
-                            sleep(0.0005)
 
                 updateDataOut()
 
@@ -238,7 +257,7 @@ while True:
         display.resetActiveDriver()
         dout = 0
         history.clearCs(display.getActiveDriver())
-        if ard:
+        if arduino.enabled:
             arduino.arduinoClose()
             arduino.arduinoInit(values["port"])
         updateDataOut()
@@ -248,7 +267,7 @@ while True:
         data = getData()
         history.add(display.getActiveDriver(), data)
         dout = display.runCommandOnActiveDriver(data)
-        if ard:
+        if arduino.enabled:
             arduino.sendCommand(display.getActiveDriver(), data)
 
         updateDataOut()
@@ -263,7 +282,7 @@ while True:
         image_layout = [
             [
                 sg.Column(
-                    [[sg.Image(key="convert_image", size=(400, 300))]],
+                    [[sg.Image(key="convert_image")]],
                     # [[sg.Image(key="con_image")]],
                     justification="center",
                 ),
@@ -297,7 +316,8 @@ while True:
                 window_convert["path"].update(filename)
 
                 im = Image.open(filename)
-                im.thumbnail((500, 400))
+                # im.thumbnail((1200, 1000))
+                im = ImageOps.contain(im, (800, 600))
                 b = io.BytesIO()
                 im.save(b, format="PNG")
                 window_convert["convert_image"].update(data=b.getvalue())
@@ -315,9 +335,8 @@ while True:
                     display.resetActiveDriver()
                     for cmd in cmds:
                         dout = display.runCommandOnActiveDriver(cmd)
-                        if ard:
+                        if arduino.enabled:
                             arduino.sendCommand(cs, cmd)
-                            sleep(0.0005)
 
                 updateDataOut()
 
