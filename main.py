@@ -80,7 +80,14 @@ main_window_layout = [
         sg.Text("Y address: ", size=(16, 1), key="y"),
         sg.Text("X address: ", size=(16, 1), key="x"),
         sg.Text("Z address: ", size=(16, 1), key="z"),
-        sg.Combo(ports, expand_x=True, enable_events=True, readonly=True, key="port"),
+        sg.Combo(
+            ports,
+            expand_x=True,
+            enable_events=True,
+            readonly=True,
+            key="port",
+            default_value="",
+        ),
         sg.Checkbox("Arduino", key="arduino", enable_events=True),
     ],
     [
@@ -127,6 +134,10 @@ while True:
     # See if user wants to quit or window was closed
     if event == sg.WINDOW_CLOSED:
         break
+
+    if event == "port":
+        ports = arduino.getPorts()
+        window["port"].update(values=ports, value=values["port"])
 
     if event == "invert":
         display.setInvert(values["invert"])
@@ -214,25 +225,51 @@ while True:
                 )
             ],
             [
-                sg.Button("Save commands to .txt", key="saveHuman", expand_x=True),
-                sg.Button("Save commands to .json", key="save", expand_x=True),
+                # sg.Button("Save commands to .txt", key="saveHuman", expand_x=True),
+                # sg.Button("Save commands to .json", key="save", expand_x=True),
+                # sg.Button("Load from .json", key="load", expand_x=True),
+                sg.Button("Save", key="save", expand_x=True),
+                sg.Button("Load", key="load", expand_x=True),
             ],
-            [sg.Button("Load from .json", key="load", expand_x=True)],
         ]
         window_cmd = sg.Window("Command history", history_layout, icon=icon, modal=True)
+        cmd_filename = ""
         while True:
             event, values = window_cmd.read()
             if event == "Exit" or event == sg.WIN_CLOSED:
                 break
 
-            if event == "saveHuman":
-                history.saveHumanReadable("commands.txt")
+            if event == "cmd_path":
+                cmd_filename = values["cmd_path"]
+                if not Path(cmd_filename).is_file():
+                    continue
+
+                window_cmd["cmd_path"].update(cmd_filename)
 
             if event == "save":
-                history.save("commands.json")
+                cmd_filename = sg.popup_get_file(
+                    "Save history",
+                    no_window=True,
+                    save_as=True,
+                    file_types=[("Json", "*.json")],
+                )
+
+                if cmd_filename == ():
+                    continue
+
+                history.save(cmd_filename)
 
             if event == "load":
-                history.load("commands.json")
+                cmd_filename = sg.popup_get_file(
+                    "Load history",
+                    no_window=True,
+                    file_types=[("Json", "*.json")],
+                )
+
+                if cmd_filename == ():
+                    continue
+
+                history.load(cmd_filename)
                 # reset drivers and run all loaded commands on the,
                 for cs, cmds in enumerate(history.commands):
                     if cs >= display.getDriversAmount():
@@ -290,10 +327,15 @@ while True:
             [
                 sg.Text("Threshold:", size=(10, 1)),
                 sg.Slider(
-                    (0, 256), orientation="horizontal", default_value=127, key="tres"
+                    (0, 256),
+                    orientation="horizontal",
+                    default_value=127,
+                    key="tres",
+                    # disable_number_display=True,
                 ),
-                sg.Text("Choose image", size=(50, 1), key="path"),
-                sg.Button("Browse", key="file"),
+                sg.Checkbox("Invert", key="convert_invert"),
+                sg.Push(),
+                sg.Button("Open", key="open"),
                 sg.Button("Convert", key="convert"),
             ],
         ]
@@ -303,19 +345,25 @@ while True:
             icon=icon,
             modal=True,
         )
+
+        convert_filename = ""
+
         while True:
             event, values = window_convert.read()
             if event == "Exit" or event == sg.WIN_CLOSED:
                 break
 
-            if event == "file":
-                filename = sg.popup_get_file("", no_window=True)
-                if not Path(filename).is_file():
+            if event == "open":
+                convert_filename = sg.popup_get_file(
+                    "",
+                    no_window=True,
+                    file_types=[("Image", "*.png *.jpeg *.jpg *.ppm")],
+                )
+                if convert_filename == ():
+                    window_convert["convert_image"].update()
                     continue
 
-                window_convert["path"].update(filename)
-
-                im = Image.open(filename)
+                im = Image.open(convert_filename)
                 # im.thumbnail((1200, 1000))
                 im = ImageOps.contain(im, (800, 600))
                 b = io.BytesIO()
@@ -323,10 +371,13 @@ while True:
                 window_convert["convert_image"].update(data=b.getvalue())
 
             if event == "convert":
-                if not Path(filename).is_file():
-                    continue
+                # if not Path(convert_filename).is_file():
+                #    continue
                 tres = values["tres"]
-                convert.convertMultipleChips(filename, display.getDriversAmount(), tres)
+                inv = values["convert_invert"]
+                convert.convertMultipleChips(
+                    convert_filename, display.getDriversAmount(), tres, inv
+                )
                 # reset drivers and run all loaded commands on the,
                 for cs, cmds in enumerate(history.commands):
                     if cs >= display.getDriversAmount():
