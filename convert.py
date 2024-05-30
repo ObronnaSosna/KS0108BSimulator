@@ -30,9 +30,6 @@ def splitIntoEights(image):
 
 
 def eightToNumber(eight):
-    # for i, v in enumerate(eight):
-    #    print(i, v, v ** int(i))
-    #    number += v ** int(i)
     s = "".join("1" if c else "0" for c in eight)
     s = s[::-1]
     number = int(s, 2)
