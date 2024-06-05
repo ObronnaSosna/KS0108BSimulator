@@ -254,7 +254,7 @@ while True:
                     file_types=[("Json", "*.json")],
                 )
 
-                if cmd_filename == ():
+                if cmd_filename == () or cmd_filename == "":
                     continue
 
                 history.save(cmd_filename)
@@ -266,7 +266,7 @@ while True:
                     file_types=[("Json", "*.json")],
                 )
 
-                if cmd_filename == ():
+                if cmd_filename == () or cmd_filename == "":
                     continue
 
                 history.load(cmd_filename)
