@@ -359,7 +359,7 @@ while True:
                     no_window=True,
                     file_types=[("Image", "*.png *.jpeg *.jpg *.ppm")],
                 )
-                if convert_filename == ():
+                if convert_filename == () or convert_filename == "":
                     window_convert["convert_image"].update()
                     continue
 
