@@ -334,6 +334,7 @@ while True:
                     # disable_number_display=True,
                 ),
                 sg.Checkbox("Invert", key="convert_invert"),
+                sg.Checkbox("Dithering", key="convert_dither", enable_events=True),
                 sg.Push(),
                 sg.Button("Open", key="open"),
                 sg.Button("Convert", key="convert"),
@@ -352,6 +353,12 @@ while True:
             event, values = window_convert.read()
             if event == "Exit" or event == sg.WIN_CLOSED:
                 break
+
+            if event == "convert_dither":
+                dith = values["convert_dither"]
+                window_convert["tres"].update(value=0 if dith else 127)
+                window_convert.refresh()
+                window_convert["tres"].update(disabled=dith)
 
             if event == "open":
                 convert_filename = sg.popup_get_file(
@@ -375,8 +382,9 @@ while True:
                 #    continue
                 tres = values["tres"]
                 inv = values["convert_invert"]
+                dith = values["convert_dither"]
                 convert.convertMultipleChips(
-                    convert_filename, display.getDriversAmount(), tres, inv
+                    convert_filename, display.getDriversAmount(), tres, inv, dith
                 )
                 # reset drivers and run all loaded commands on the,
                 for cs, cmds in enumerate(history.commands):

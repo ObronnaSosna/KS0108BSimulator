@@ -3,7 +3,12 @@ import numpy as np
 import history
 
 
-def prepareImage(image, threshold=127):
+def prepareImage(image, threshold=127, dither=False):
+    if dither:
+        image = image.resize((64, 64))
+        image = image.convert("1", dither=Image.Dither.FLOYDSTEINBERG)
+        return image
+
     # Grayscale
     image = image.convert("L")
     # Threshold
@@ -12,7 +17,6 @@ def prepareImage(image, threshold=127):
     image = image.convert("1")
     # to 64x64
     image = image.resize((64, 64))
-
     return image
 
 
@@ -36,8 +40,8 @@ def eightToNumber(eight):
     return number
 
 
-def convertToCommands(image, cs, threshold, invert):
-    image = prepareImage(image, threshold)
+def convertToCommands(image, cs, threshold, invert, dither):
+    image = prepareImage(image, threshold, dither)
     eights = splitIntoEights(image)
     for i, eight in enumerate(eights):
         if i % 64 == 0:
@@ -51,19 +55,19 @@ def convertToCommands(image, cs, threshold, invert):
     # history.save("commands.json")
 
 
-def convertMultipleChips(filename, cs, threshold=127, invert=False):
+def convertMultipleChips(filename, cs, threshold=127, invert=False, dither=False):
     image = Image.open(filename)
     history.clear()
     if cs == 1:
-        convertToCommands(image, 0, threshold, invert)
+        convertToCommands(image, 0, threshold, invert, dither)
     if cs == 2:
         x, y = image.size
         box1 = (0, 0, x // 2, y)
         box2 = (x // 2, 0, x, y)
         half1 = image.crop(box1)
         half2 = image.crop(box2)
-        convertToCommands(half1, 0, threshold, invert)
-        convertToCommands(half2, 1, threshold, invert)
+        convertToCommands(half1, 0, threshold, invert, dither)
+        convertToCommands(half2, 1, threshold, invert, dither)
     if cs == 3:
         x, y = image.size
         box1 = (0, 0, x // 3, y)
@@ -72,9 +76,9 @@ def convertMultipleChips(filename, cs, threshold=127, invert=False):
         half1 = image.crop(box1)
         half2 = image.crop(box2)
         half3 = image.crop(box3)
-        convertToCommands(half1, 0, threshold, invert)
-        convertToCommands(half2, 1, threshold, invert)
-        convertToCommands(half3, 2, threshold, invert)
+        convertToCommands(half1, 0, threshold, invert, dither)
+        convertToCommands(half2, 1, threshold, invert, dither)
+        convertToCommands(half3, 2, threshold, invert, dither)
 
 
 # image = Image.open("test3.png")
